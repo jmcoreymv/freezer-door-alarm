@@ -4,9 +4,12 @@
 #include "log.h"
 
 
-#define SEC_TO_USEC     1000000  /* Conversion factor for micro seconds to seconds */
-#define DAY_TO_SEC      24*60*60
+#define SEC_TO_USEC     (1000000)  /* Conversion factor for micro seconds to seconds */
+#define DAY_TO_SEC      (24*60*60)
+#define MIN_TO_SEC      (60)
 
+// Variables to keep track of across deep sleep cycles
+// These stick around in the RTC memory
 RTC_DATA_ATTR int   doorOpenTimeSec      = 0;
 RTC_DATA_ATTR bool  doorNotificationSent = false;
 
@@ -25,6 +28,7 @@ int connectToWifi();
 void sendEmailNotifications(String messageStr, void(*cb_func)(SendStatus Info));
 void sendEmailAliveCallback(SendStatus info);
 void sendEmailDoorOpenCallback(SendStatus info);
+String addHtmlWrapper(String messageStr);
 
 int doorOpenNotificationCheck();
 int aliveNotificationCheck();
@@ -40,6 +44,9 @@ void setup(){
 
     // Keep track of various time-related variables
     incrementTime();
+
+    float timeAliveInDays = (float)timeSinceBootSec / (float)DAY_TO_SEC;
+    log("Time since boot: " + String(timeAliveInDays) + " days");
 
     if (doorOpenNotificationCheck() < 0) {
         goto prepareForSleep;
@@ -139,14 +146,21 @@ int aliveNotificationCheck() {
     return 0;
 }
 
+String addHtmlWrapper(String messageStr) {
+    return "<div style=\"color:#2f4468;\"><h1>" + messageStr + "</h1><p>- Sent from the Freezer Monitor</p></div>";
+}
+
 
 void sendDoorOpenNotification() {
-    String msg = "<div style=\"color:#2f4468;\"><h1>Alert! Freezer door has been open for " + String(DOOR_MAX_OPEN_TIME_SEC) + " seconds</h1><p>- Sent from the Freezer Monitor</p></div>";
+    float openTimeInMinutes = (float)DOOR_MAX_OPEN_TIME_SEC / (float)MIN_TO_SEC;
+    String msg = addHtmlWrapper("Alert! Freezer door has been open for " + String(openTimeInMinutes, 1) + " minutes");
     sendEmailNotifications(msg, sendEmailDoorOpenCallback);
 }
 
+
 void sendAliveNotification() {
-    String msg = "<div style=\"color:#2f4468;\"><h1>Info: Just letting you know I've been alive for  " + String(timeSinceBootSec / DAY_TO_SEC) + " days</h1><p>- Sent from the Freezer Monitor</p></div>";
+    float aliveTimeInDays = (float)timeSinceBootSec / (float)DAY_TO_SEC;
+    String msg = addHtmlWrapper("Info: Just letting you know I've been alive for  " + String(aliveTimeInDays, 1) + " days");
     sendEmailNotifications(msg, sendEmailAliveCallback);
 }
 
@@ -167,7 +181,6 @@ void sendEmailNotifications(String messageStr, void (*cb_func)(SendStatus )) {
         smtpData.addRecipient(emailRecipients[i]);
     }
 
-    //smtpData.setSendCallback(sendEmailCallback);
     smtpData.setSendCallback(cb_func);
 
     //Start sending Email
@@ -189,6 +202,7 @@ void sendEmailDoorOpenCallback(SendStatus msg) {
         doorNotificationSent = true;
     }
 }
+
 
 void sendEmailAliveCallback(SendStatus msg) {
     log(msg.info());
