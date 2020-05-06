@@ -16,12 +16,12 @@ RTC_DATA_ATTR bool  doorNotificationSent = false;
 RTC_DATA_ATTR int   timeSinceAliveNotificationSec = 0;
 RTC_DATA_ATTR int   timeSinceBootSec = 0;
 
-
+void init();
 void incrementTime();
 
 // Sensor related functions
-int checkDoorSensor();
-int isDoorLeftOpen();
+int getDoorState();
+bool isDoorLeftOpen();
 
 // Notification related functions
 int connectToWifi();
@@ -36,10 +36,14 @@ int aliveNotificationCheck();
 void sendDoorOpenNotification();
 void sendAliveNotification();
 
-
+// Configure hardware
+void init() {
+    pinMode(DOOR_SENSOR_PIN, INPUT);
+}
 
 // Main function
 void setup(){
+    init();
     logSetup();
 
     // Keep track of various time-related variables
@@ -56,7 +60,6 @@ void setup(){
         goto prepareForSleep;
     }
 
-
 prepareForSleep:
     esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP_SEC * SEC_TO_USEC);
     log("Sleeping for " + String(TIME_TO_SLEEP_SEC) + " seconds...");
@@ -66,8 +69,8 @@ prepareForSleep:
   
 
 // Keep track of how many times in a row the door has been open to determine if someone left it open
-int isDoorLeftOpen() {
-    if (checkDoorSensor() == DOOR_OPEN) {
+bool isDoorLeftOpen() {
+    if (getDoorState() == DOOR_OPEN) {
         doorOpenTimeSec += TIME_TO_SLEEP_SEC;
         log("Door open time: " + String(doorOpenTimeSec) + " seconds");
     }
@@ -91,9 +94,8 @@ void incrementTime() {
 }
 
 // Check whether the door is currently open
-int checkDoorSensor() {
+int getDoorState() {
     int doorState = 0;
-    pinMode(DOOR_SENSOR_PIN, INPUT);
     doorState = digitalRead(DOOR_SENSOR_PIN);
     return doorState;
 }
